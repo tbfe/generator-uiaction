@@ -6,11 +6,6 @@ var yosay = require('yosay');
 //var program = require('ast-query');
 module.exports = yeoman.generators.Base.extend({
   initializing: function () {
-    this.argument('name', {
-      required: true,
-      type: String,
-      desc: 'action name'
-    });
     this.log(yosay(
       chalk.cyan('贴吧无线UI ACTION生成器')
     ));
@@ -18,23 +13,23 @@ module.exports = yeoman.generators.Base.extend({
 
   },
   _getExistResult: function(actions, name) {
-
     var exist = {
       isExistFile: false,
-      isExistFolder: false,
     };
-    actions.forEach(function(i) {
-      var indexName = this._.chain(i).strRightBack('/').value();
-      if (indexName.indexOf(name) >= 0) {
+
+    if (actions.length > 0) {
+      actions.forEach(function(i) {
+        var indexName = this._.chain(i).strRightBack('/').value();
         if (indexName.indexOf('php') >= 0) {
-          exist.isExistFile = true;
+          if (indexName.indexOf(name) >= 0) {
+            exist.isExistFile = true;
+          }
         } else {
-          exist.isExistFolder = true;
+          var subActions = this.expand(this.destinationPath('actions/' + name + '/*'));
+
+          exist = this._getExistResult(subActions, name);
         }
-      }
-    }.bind(this));
-    if (exist.isExistFolder) {
-      exist.isExistFile = false;
+      }.bind(this));
     }
     return exist;
   },
@@ -43,7 +38,6 @@ module.exports = yeoman.generators.Base.extend({
     var done = this.async();
     var prompts = [];
     var actions = this.expand(this.destinationPath('actions/*'));
-    var exist = this._getExistResult(actions, this.name);
 
     this.author = process.env.USER;
     this.prepareForWrite = {
@@ -65,69 +59,51 @@ module.exports = yeoman.generators.Base.extend({
         }
       });
     }
-    // 如果存在同名文件，则提示错误，重新输过名字
-    if (exist.isExistFile) {
-      prompts.push({
-        type: 'input',
-        name: 'actionName',
-        message: '已经有一个同名的action文件啦，不能覆盖它哦，重新起个名字吧：',
-        store: false,
-        validate: function(input) {
-          var existObj = this._getExistResult(actions, input);
-          if (!input || existObj.isExistFile){
-            return false;
-          }
-          return true;
-        }.bind(this)
-      });
-    }
-    // 如果存在同名目录，则往这个目录下增加文件
-    if (exist.isExistFolder) {
-      var actionsInFolder = this.expand(this.destinationPath('actions/' + this.name + '/*'));
-      var actionsInFolderExist = this._getExistResult(actionsInFolder, this.name);
-      this.prepareForWrite.toActionRoot = false;
-      this.prepareForWrite.actionFolder = this.name;
-      if (actionsInFolderExist.isExistFile) {
-        prompts.push({
-          type: 'input',
-          name: 'actionName',
-          message: '已经有一个同名的action文件啦，不能覆盖它哦，重新起个名字吧：',
-          store: false,
-          validate: function(input) {
-            var existObj = this._getExistResult(actionsInFolder, input);
-            if (!input || existObj.isExistFile){
-              return false;
-            }
-            return true;
-          }.bind(this)
-        });
-      }
-    }
+    prompts.push({
+      type: 'input',
+      name: 'folderName',
+      message: '将要放入到哪个目录下（为空的话将直接放到根目录下，慎重~）：',
+      store: true,
+    }, {
+      type: 'input',
+      name: 'actionName',
+      message: '来一发action名字吧（不要带Action后缀哦~）：',
+      store: false,
+      validate: function(input) {
+        var existObj = this._getExistResult(actions, input);
+        if (!input || existObj.isExistFile){
+          return '这个action已经存在了哦，换个名字吧~';
+        }
+        return true;
+      }.bind(this)
+    });
 
     this.prompt(prompts, function(anwsers) {
-      this.name = anwsers.actionName || this.name;
+      this.actionConf = anwsers;
       this.author = anwsers.author || this.author;
       done();
     }.bind(this));
   },
 
   writing: function() {
-    var fileBase = this._.camelize(this.name);
+    var folder = this.actionConf.folderName;
+    var action = this._.camelize(this.actionConf.actionName);
     var date = ((new Date()).getFullYear()) + '-' + ((new Date()).getMonth() + 1) + '-' + ((new Date()).getDate());
     var defaultParams = {
       author: this.author,
       date: date,
-      className: this._.camelize(this.name)
+      actionName: action,
+      tplName: this._.underscored(this.actionConf.actionName)
     };
-    if (this.prepareForWrite.toActionRoot) {
+    if (!folder || folder.length === 0) {
       this.fs.copyTpl(
         this.templatePath('actionAction.php'),
-        this.destinationPath('actions/' + fileBase + 'Action.php'), defaultParams
+        this.destinationPath('actions/' + action + 'Action.php'), defaultParams
       );
     } else {
       this.fs.copyTpl(
         this.templatePath('actionAction.php'),
-        this.destinationPath('actions/' + this._.camelize(this.prepareForWrite.actionFolder) + '/' + fileBase + 'Action.php'), defaultParams
+        this.destinationPath('actions/' + folder + '/' + action + 'Action.php'), defaultParams
       );
     }
     // TODO 向router中写入一个路由
