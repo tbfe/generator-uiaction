@@ -1,6 +1,6 @@
 {
   "name": "generator-uiaction",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "百度贴吧无线ui action生成器",
   "main": "index.js",
   "scripts": {
