@@ -2,49 +2,42 @@
 var yeoman = require('yeoman-generator');
 var chalk = require('chalk');
 var yosay = require('yosay');
-//for parsing and manipulate javascript code
-//var program = require('ast-query');
+var path = require('path');
+var util = require('../util.js');
+
 module.exports = yeoman.generators.Base.extend({
   initializing: function () {
     this.log(yosay(
       chalk.cyan('贴吧无线UI ACTION生成器')
     ));
     this.actionConf = {};
-
   },
-  _getExistResult: function(actions, name) {
-    var exist = {
-      isExistFile: false,
-    };
+  _getExistFileResult: function (folder, name) {
+    var isExistFile = false;
+    var file;
+    if (name && name.length > 0) {
+      if (!folder) {
+        file = this.expand(this.destinationPath('actions/' + name + 'Action.php'));
+      } else {
+        file = this.expand(this.destinationPath('actions/' + folder + '/' + name + 'Action.php'));
+      }
 
-    if (actions.length > 0) {
-      actions.forEach(function(i) {
-        var indexName = this._.chain(i).strRightBack('/').value();
-        if (indexName.indexOf('php') >= 0) {
-          if (indexName.indexOf(name) >= 0) {
-            exist.isExistFile = true;
-          }
-        } else {
-          var subActions = this.expand(this.destinationPath('actions/' + name + '/*'));
-
-          exist = this._getExistResult(subActions, name);
-        }
-      }.bind(this));
+      if (file.length > 0) {
+        isExistFile = true;
+      }
     }
-    return exist;
+    return isExistFile;
   },
 
   prompting: function () {
     var done = this.async();
     var prompts = [];
-    var actions = this.expand(this.destinationPath('actions/*'));
 
     this.author = process.env.USER;
     this.prepareForWrite = {
       toActionRoot: true,
       actionFolder: ''
     };
-
     if (! this.author) {
       prompts.push({
         type: 'input',
@@ -64,18 +57,36 @@ module.exports = yeoman.generators.Base.extend({
       name: 'folderName',
       message: '将要放入到哪个目录下（为空的话将直接放到根目录下，慎重~）：',
       store: true,
+      filter: function (input) {
+        return input.replace('_', '').replace('-','');
+      },
     }, {
       type: 'input',
       name: 'actionName',
       message: '来一发action名字吧（不要带Action后缀哦~）：',
       store: false,
+      when: function (anwsers) {
+        this.folderName = anwsers.folderName;
+        return anwsers.folderName;
+      }.bind(this),
+      filter: function(input) {
+        return this._.camelize(input);
+      }.bind(this),
       validate: function(input) {
-        var existObj = this._getExistResult(actions, input);
-        if (!input || existObj.isExistFile){
+        var isExistFile = this._getExistFileResult(this.folderName, this._.camelize(input));
+        if (!input) {
+          return '不能为空哦~';
+        }
+        if (isExistFile){
           return '这个action已经存在了哦，换个名字吧~';
         }
         return true;
       }.bind(this)
+    }, {
+      type: 'input',
+      name: 'desc',
+      message: '这个action是用来干嘛的呢：',
+      store: false,
     });
 
     this.prompt(prompts, function(anwsers) {
@@ -87,7 +98,7 @@ module.exports = yeoman.generators.Base.extend({
 
   writing: function() {
     var folder = this.actionConf.folderName;
-    var action = this._.camelize(this.actionConf.actionName);
+    var action = this.actionConf.actionName;
     var date = ((new Date()).getFullYear()) + '-' + ((new Date()).getMonth() + 1) + '-' + ((new Date()).getDate());
     var defaultParams = {
       author: this.author,
@@ -106,6 +117,22 @@ module.exports = yeoman.generators.Base.extend({
         this.destinationPath('actions/' + folder + '/' + action + 'Action.php'), defaultParams
       );
     }
-    // TODO 向router中写入一个路由
+
+    // 向router中写入一个路由
+    var cwd = this.env.cwd;
+    var modName = this._.capitalize(this._.chain(cwd).strRightBack('/'));
+    var routerConfig = {
+      reg: (folder + action).toLowerCase(),
+      file: 'libs/' + modName + '/Router.php',
+      needle: ');',
+      splicable: ["'" + (folder + action).toLowerCase() + "'\t=>\t'" + folder + "/" + action + "',\t// " + this.actionConf.desc]
+    };
+
+    setTimeout(function() {
+      util.rewriteFile(routerConfig);
+    }, 500);
+  },
+  end: function() {
+    this.log(chalk.green('yo yo 文件已经生成好啦，已经往Router中写入了配置~~\n') + chalk.white('You are ready to go') + '\n' + chalk.green('HAPPY CODING \\(^____^)/'));
   }
 });
