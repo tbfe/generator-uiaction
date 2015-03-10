@@ -87,6 +87,11 @@ module.exports = yeoman.generators.Base.extend({
       name: 'desc',
       message: '这个action是用来干嘛的呢：',
       store: false,
+    }, {
+      type: 'confirm',
+      name: 'needWriteRouter',
+      message: '是否需要向Router.php文件写入路由配置',
+      store: false
     });
 
     this.prompt(prompts, function(anwsers) {
@@ -99,6 +104,7 @@ module.exports = yeoman.generators.Base.extend({
   writing: function() {
     var folder = this.actionConf.folderName;
     var action = this.actionConf.actionName;
+    var needWriteRouter = this.actionConf.needWriteRouter;
     var date = ((new Date()).getFullYear()) + '-' + ((new Date()).getMonth() + 1) + '-' + ((new Date()).getDate());
     var defaultParams = {
       author: this.author,
@@ -118,21 +124,27 @@ module.exports = yeoman.generators.Base.extend({
       );
     }
 
-    // 向router中写入一个路由
-    var cwd = this.env.cwd;
-    var modName = this._.capitalize(this._.chain(cwd).strRightBack('/'));
-    var routerConfig = {
-      reg: (folder + action).toLowerCase(),
-      file: 'libs/' + modName + '/Router.php',
-      needle: ');',
-      splicable: ["'" + (folder + '/' + action).toLowerCase() + "'\t=>\t'" + folder + "/" + action + "',\t// " + this.actionConf.desc]
-    };
+    if (needWriteRouter) {
+      // 向router中写入一个路由
+      var cwd = this.env.cwd;
+      var modName = this._.capitalize(this._.chain(cwd).strRightBack('/'));
+      var routerConfig = {
+        reg: (folder + action).toLowerCase(),
+        file: 'libs/' + modName + '/Router.php',
+        needle: ');',
+        splicable: ["'" + (folder + '/' + action).toLowerCase() + "'\t=>\t'" + folder + "/" + action + "',\t// " + this.actionConf.desc]
+      };
+      setTimeout(function() {
+        util.rewriteFile(routerConfig);
+      }, 500);
+    }
 
-    setTimeout(function() {
-      util.rewriteFile(routerConfig);
-    }, 500);
   },
   end: function() {
-    this.log(chalk.green('yo yo 文件已经生成好啦，已经往Router中写入了配置~~\n') + chalk.white('You are ready to go') + '\n' + chalk.green('HAPPY CODING \\(^____^)/'));
+    var talkText = 'yo yo 文件已经生成好啦~~\n';
+    if (this.actionConf.needWriteRouter) {
+      talkText = 'yo yo 文件已经生成好啦，已经往Router中写入了配置~~\n';
+    }
+    this.log(chalk.green(talkText) + chalk.white('You are ready to go') + '\n' + chalk.green('HAPPY CODING \\(^____^)/'));
   }
 });
