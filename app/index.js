@@ -125,7 +125,7 @@ module.exports = yeoman.generators.Base.extend({
       reg: (folder + action).toLowerCase(),
       file: 'libs/' + modName + '/Router.php',
       needle: ');',
-      splicable: ["'" + (folder + action).toLowerCase() + "'\t=>\t'" + folder + "/" + action + "',\t// " + this.actionConf.desc]
+      splicable: ["'" + (folder + '/' + action).toLowerCase() + "'\t=>\t'" + folder + "/" + action + "',\t// " + this.actionConf.desc]
     };
 
     setTimeout(function() {
